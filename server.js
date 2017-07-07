@@ -2,13 +2,43 @@ const express = require('express');
 const http = require('http');
 const url = require('url');
 const WebSocket = require('ws');
+const morgan = require('morgan');
 const { server: config } = require('./config/config');
 
 const app = express();
 
-app.use((req, res) => res.send({ msg: 'hello' }));
+const page = `
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset='utf-8'>
+    </head>
+    <body>
+        <div>This is the page</div>
+        <button id='send-button'>Send Websocket Message</button>
+        <script src='/public/main.js'></script>
+    </body>
+</html>
+`;
+
+app.use(morgan());
+
+app.use('/public', express.static('public'));
+
+app.get('/', (req, res) => {
+    res.status(200).send(page);
+});
+
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
+
+function broadcastMessage(message) {
+    wss.clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(message);
+        }
+    });
+}
 
 wss.on('connection', function connection(ws, req) {
     const location = url.parse(req.url, true);
@@ -18,6 +48,11 @@ wss.on('connection', function connection(ws, req) {
     });
 
     ws.send('something');
+});
+
+app.post('/send-message', (req, res) => {
+    broadcastMessage('message initiated from web browser');
+    res.status(200).send({ success: true });
 });
 
 server.listen(config, function listening() {
