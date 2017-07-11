@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const url = require('url');
 const WebSocket = require('ws');
+const knex = require('./knex-setup');
 const morgan = require('morgan');
 const { server: config } = require('./config/config');
 
@@ -51,18 +52,30 @@ wss.on('connection', function connection(ws, req) {
     ws.send('something');
 });
 
-const messageCache = [];
+function saveMessage(message) {
+    knex('messages').insert({ text: message })
+        .catch(err => console.log(err));
+}
+
+function getMessages() {
+    return knex.select('text').from('messages')
+        .then(rows => rows.map(row => row.text))
+        .catch(err => console.log(err));
+}
 
 function handleMessage(ws, messageString) {
     const messageData = JSON.parse(messageString);
 
     switch(messageData.type) {
         case 'CLIENT-MESSAGE':
-            messageCache.push(messageData.message);
+            saveMessage(messageData.message);
             break;
 
         case 'SEND-ALL-TO-CLIENT':
-            ws.send(JSON.stringify(messageCache));
+            getMessages().then(savedMessages => {
+                const savedMessageString = JSON.stringify(savedMessages);
+                ws.send(savedMessageString);
+            });
             break;
     }
 }
