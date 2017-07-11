@@ -45,10 +45,27 @@ wss.on('connection', function connection(ws, req) {
 
     ws.on('message', function incoming(message) {
         console.log('received %s', message);
+        handleMessage(ws, message);
     });
 
     ws.send('something');
 });
+
+const messageCache = [];
+
+function handleMessage(ws, messageString) {
+    const messageData = JSON.parse(messageString);
+
+    switch(messageData.type) {
+        case 'CLIENT-MESSAGE':
+            messageCache.push(messageData.message);
+            break;
+
+        case 'SEND-ALL-TO-CLIENT':
+            ws.send(JSON.stringify(messageCache));
+            break;
+    }
+}
 
 app.post('/send-message', (req, res) => {
     broadcastMessage('message initiated from web browser');
